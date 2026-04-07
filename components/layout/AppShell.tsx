@@ -4,10 +4,15 @@ import { getHubLinks } from "@/lib/hub/links";
 
 const navLinkClass =
   "inline-flex items-center justify-center rounded-[var(--ds-radius-pill)] border border-[var(--ds-color-border-strong)] bg-[var(--ds-color-surface-glassStrong)] px-4 py-2 text-sm font-medium text-[var(--ds-color-brand-secondary)] shadow-[var(--ds-shadow-soft)] transition hover:bg-white/90";
+const salesHubLinkClass =
+  "inline-flex items-center justify-center rounded-[var(--ds-radius-pill)] border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-[var(--ds-shadow-soft)] transition hover:bg-slate-800";
+const logoutButtonClass =
+  "inline-flex items-center justify-center rounded-[var(--ds-radius-pill)] border border-rose-300 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 shadow-[var(--ds-shadow-soft)] transition hover:bg-rose-100";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const hubLinks = getHubLinks();
   const currentAppKey = "people_hunt";
+  const salesHubUrl = "https://saleshub.personeel.com";
   const appNav = [
     { href: "/dashboard", label: "Dashboard" },
     { href: "/hunts", label: "Hunts" },
@@ -25,27 +30,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               LinkedIn People Hunt
             </Link>
             <nav className="flex flex-wrap items-center gap-3 text-sm">
-              {hubLinks.map((link) => (
-                <a
-                  key={link.key}
-                  href={link.href}
-                  className={`${navLinkClass} ${link.key === currentAppKey ? link.accentClass : ""}`}
-                >
-                  {link.label}
-                </a>
-              ))}
-              {appNav.map((item) => (
-                <Link key={item.href} href={item.href} className={navLinkClass}>
-                  {item.label}
-                </Link>
-              ))}
+              <a href={salesHubUrl} className={salesHubLinkClass}>
+                Sales Hub
+              </a>
+              <div className="flex flex-wrap items-center gap-2 rounded-[var(--ds-radius-pill)] border border-white/80 bg-white/40 p-1">
+                {hubLinks.map((link) => (
+                  <a
+                    key={link.key}
+                    href={link.href}
+                    className={`${navLinkClass} ${link.key === currentAppKey ? link.accentClass : ""}`}
+                  >
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-2 rounded-[var(--ds-radius-pill)] border border-white/80 bg-white/40 p-1">
+                {appNav.map((item) => (
+                  <Link key={item.href} href={item.href} className={navLinkClass}>
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
               <form
                 action={async () => {
                   "use server";
                   await signOut({ redirectTo: "/login" });
                 }}
               >
-                <button className={navLinkClass} type="submit">
+                <button className={logoutButtonClass} type="submit">
                   Log out
                 </button>
               </form>
