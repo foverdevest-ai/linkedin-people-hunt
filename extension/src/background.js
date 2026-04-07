@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE = "http://localhost:3000";
+const DEFAULT_API_BASE = "https://people-hunt.personeel.com";
 
 async function getApiBase() {
   const { appApiBase } = await chrome.storage.local.get(["appApiBase"]);

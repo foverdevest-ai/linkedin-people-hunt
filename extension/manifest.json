@@ -6,7 +6,9 @@
   "permissions": ["storage", "activeTab", "scripting", "clipboardRead"],
   "host_permissions": [
     "https://www.linkedin.com/*",
-    "http://localhost:3000/*"
+    "http://localhost:3000/*",
+    "https://people-hunt.personeel.com/*",
+    "https://*.personeel.com/*"
   ],
   "background": {
     "service_worker": "src/background.js"

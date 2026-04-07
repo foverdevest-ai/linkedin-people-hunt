@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE = "http://localhost:3000";
+const DEFAULT_API_BASE = "https://people-hunt.personeel.com";
 
 const messageEl = document.getElementById("message");
 const savedStatusEl = document.getElementById("savedStatus");
@@ -16,14 +16,35 @@ async function getApiBase() {
   return appApiBase || DEFAULT_API_BASE;
 }
 
-async function readHandshakeToken() {
+function parseHandshakeInput(value) {
+  const trimmed = value.trim();
+  if (!trimmed) return { token: "", apiBase: "" };
+
+  if (trimmed.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (typeof parsed.token === "string") {
+        return {
+          token: parsed.token.trim(),
+          apiBase: typeof parsed.apiBase === "string" ? parsed.apiBase.trim() : ""
+        };
+      }
+    } catch {
+      // Fall through and treat as raw token.
+    }
+  }
+
+  return { token: trimmed, apiBase: "" };
+}
+
+async function readHandshakeInput() {
   const manual = tokenInputEl.value.trim();
-  if (manual) return manual;
+  if (manual) return parseHandshakeInput(manual);
   try {
     const clipboard = await navigator.clipboard.readText();
-    return clipboard.trim();
+    return parseHandshakeInput(clipboard);
   } catch {
-    return "";
+    return { token: "", apiBase: "" };
   }
 }
 
@@ -43,10 +64,14 @@ async function completeConnection() {
   connectBtnEl.disabled = true;
   setMessage("Completing handshake...", "muted");
   try {
-    const token = await readHandshakeToken();
+    const handshake = await readHandshakeInput();
+    const token = handshake.token;
     if (!token) {
       setMessage("No handshake token found. Start connect in app settings first.", "warn");
       return;
+    }
+    if (handshake.apiBase) {
+      await chrome.storage.local.set({ appApiBase: handshake.apiBase });
     }
 
     const apiBase = await getApiBase();

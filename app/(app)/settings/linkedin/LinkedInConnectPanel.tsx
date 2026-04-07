@@ -35,6 +35,7 @@ export function LinkedInConnectPanel({ initial }: Props) {
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [payloadPreview, setPayloadPreview] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
 
   async function refreshConnection() {
@@ -72,12 +73,17 @@ export function LinkedInConnectPanel({ initial }: Props) {
       setToken(json.token);
       setExpiresAt(json.expiresAt);
       setConnection((current) => ({ ...current, status: "connecting" }));
+      const connectPayload = JSON.stringify({
+        token: json.token,
+        apiBase: window.location.origin
+      });
+      setPayloadPreview(connectPayload);
 
       try {
-        await navigator.clipboard.writeText(json.token);
-        setFeedback("Handshake token copied. Open the extension popup and click Complete Connection.");
+        await navigator.clipboard.writeText(connectPayload);
+        setFeedback("Connection payload copied. Open the extension popup and click Complete Connection.");
       } catch {
-        setFeedback("Handshake created. Copy token and complete connection in extension popup.");
+        setFeedback("Connection payload created. Copy it and complete connection in extension popup.");
       }
 
       await refreshConnection();
@@ -114,6 +120,7 @@ export function LinkedInConnectPanel({ initial }: Props) {
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Current handshake token</p>
           <p className="mt-2 break-all font-mono text-xs text-slate-700">{tokenPreview}</p>
           <p className="mt-2 text-xs text-muted">Expires: {formatDate(expiresAt)}</p>
+          {payloadPreview ? <p className="mt-1 text-xs text-muted">Copied payload includes apiBase + token.</p> : null}
         </div>
       ) : null}
     </div>
