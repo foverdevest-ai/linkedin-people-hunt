@@ -4,10 +4,12 @@ import { prisma } from "@/lib/db";
 import { requireActorUser } from "@/lib/auth/current-user";
 import { env } from "@/lib/env";
 import { writeAuditLog } from "@/lib/audit/write";
+import { classifyLinkedInInputUrl } from "@/lib/linkedin/input-url";
+import { ingestCandidatesForRun } from "@/lib/hunts/ingest";
 
 const createHuntSchema = z.object({
   name: z.string().trim().max(120).optional(),
-  inputUrl: z.string().url(),
+  inputUrl: z.string().trim().url(),
   autopilot: z.boolean().default(true),
   maxPages: z.coerce.number().int().min(1).max(50).default(env.DEFAULT_RUN_MAX_PAGES)
 });
@@ -34,12 +36,22 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid payload", issues: parsed.error.issues }, { status: 400 });
     }
+    const inputUrlType = classifyLinkedInInputUrl(parsed.data.inputUrl);
+    if (inputUrlType.type === "unsupported") {
+      return NextResponse.json(
+        {
+          error:
+            "Unsupported LinkedIn URL. Use a people search URL (/search/results/people/...) or a profile URL (/in/...)."
+        },
+        { status: 400 }
+      );
+    }
 
     const run = await prisma.huntRun.create({
       data: {
         userId: actor.id,
         name: parsed.data.name,
-        inputUrl: parsed.data.inputUrl,
+        inputUrl: inputUrlType.normalizedUrl,
         autopilot: parsed.data.autopilot,
         maxPages: parsed.data.maxPages,
         status: "draft"
@@ -50,8 +62,32 @@ export async function POST(request: Request) {
       entityType: "hunt_run",
       entityId: run.id,
       action: "hunt_created",
-      metadataJson: { inputUrl: run.inputUrl, autopilot: run.autopilot, maxPages: run.maxPages }
+      metadataJson: { inputUrl: run.inputUrl, inputUrlType: inputUrlType.type, autopilot: run.autopilot, maxPages: run.maxPages }
     });
+
+    if (inputUrlType.type === "profile") {
+      const results = await ingestCandidatesForRun({
+        actorUserId: actor.id,
+        run: { id: run.id, autopilot: run.autopilot },
+        candidates: [
+          {
+            profileUrl: inputUrlType.normalizedUrl,
+            searchUrl: run.inputUrl,
+            messageable: true,
+            raw: { source: "manual_profile_input" }
+          }
+        ]
+      });
+
+      await writeAuditLog({
+        actorUserId: actor.id,
+        entityType: "hunt_run",
+        entityId: run.id,
+        action: "prospects_ingested",
+        metadataJson: { count: 1, source: "profile_input", results }
+      });
+    }
+
     return NextResponse.json({ id: run.id });
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {

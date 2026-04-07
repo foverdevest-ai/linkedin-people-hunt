@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LinkedIn People Hunt</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        width: 340px;
+        background: #f8fafc;
+        color: #0f172a;
+      }
+      .wrap {
+        padding: 14px;
+      }
+      h1 {
+        font-size: 16px;
+        margin: 0 0 10px;
+      }
+      p {
+        margin: 6px 0;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      input,
+      button {
+        font-size: 12px;
+      }
+      input {
+        width: 100%;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        padding: 8px;
+        box-sizing: border-box;
+      }
+      button {
+        border: 0;
+        border-radius: 8px;
+        background: #0369a1;
+        color: white;
+        padding: 8px 10px;
+        cursor: pointer;
+      }
+      button[disabled] {
+        opacity: 0.7;
+        cursor: default;
+      }
+      .muted {
+        color: #475569;
+      }
+      .status {
+        margin-top: 8px;
+        font-weight: 600;
+      }
+      .ok {
+        color: #166534;
+      }
+      .warn {
+        color: #9a3412;
+      }
+      .token {
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>LinkedIn People Hunt</h1>
+      <p class="muted">Start connection in app settings, then complete here.</p>
+      <p id="savedStatus" class="status muted">Session: not connected</p>
+
+      <div class="token">
+        <input id="tokenInput" placeholder="Paste handshake token if clipboard read fails" />
+      </div>
+
+      <div class="row">
+        <button id="connectBtn">Complete Connection</button>
+        <button id="heartbeatBtn">Send Heartbeat</button>
+      </div>
+
+      <p id="message" class="status muted"></p>
+    </div>
+
+    <script src="src/popup.js"></script>
+  </body>
+</html>

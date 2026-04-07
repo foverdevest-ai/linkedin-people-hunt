@@ -8,6 +8,13 @@ const navLinkClass =
 export function AppShell({ children }: { children: React.ReactNode }) {
   const hubLinks = getHubLinks();
   const currentAppKey = "people_hunt";
+  const appNav = [
+    { href: "/dashboard", label: "Dashboard" },
+    { href: "/hunts", label: "Hunts" },
+    { href: "/replies", label: "Replies" },
+    { href: "/settings/linkedin", label: "LinkedIn Settings" }
+  ] as const;
+
   return (
     <>
       <header className="container-shell pt-6 motion-fade-up">
@@ -26,6 +33,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 >
                   {link.label}
                 </a>
+              ))}
+              {appNav.map((item) => (
+                <Link key={item.href} href={item.href} className={navLinkClass}>
+                  {item.label}
+                </Link>
               ))}
               <form
                 action={async () => {

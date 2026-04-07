@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireActorUser } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/db";
 import { hashToken, signExtensionToken, timingSafeEqualString } from "@/lib/security";
 import { writeAuditLog } from "@/lib/audit/write";
@@ -13,7 +12,6 @@ const schema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const actor = await requireActorUser();
     const parsed = schema.safeParse(await request.json());
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid payload", issues: parsed.error.issues }, { status: 400 });
@@ -22,9 +20,6 @@ export async function POST(request: Request) {
     const [userId, nonce, exp, signature] = parsed.data.token.split(".");
     if (!userId || !nonce || !exp || !signature) {
       return NextResponse.json({ error: "Invalid token shape" }, { status: 400 });
-    }
-    if (userId !== actor.id) {
-      return NextResponse.json({ error: "Token user mismatch" }, { status: 403 });
     }
 
     const payload = `${userId}.${nonce}.${exp}`;
@@ -50,9 +45,9 @@ export async function POST(request: Request) {
         data: { usedAt: new Date() }
       }),
       prisma.linkedInConnection.upsert({
-        where: { userId_providerType: { userId: actor.id, providerType: "browser_extension" } },
+        where: { userId_providerType: { userId, providerType: "browser_extension" } },
         create: {
-          userId: actor.id,
+          userId,
           providerType: "browser_extension",
           status: "connected",
           lastSeenAt: new Date(),
@@ -67,18 +62,15 @@ export async function POST(request: Request) {
     ]);
 
     await writeAuditLog({
-      actorUserId: actor.id,
+      actorUserId: userId,
       entityType: "linkedin_connection",
-      entityId: actor.id,
+      entityId: userId,
       action: "linkedin_connected",
       metadataJson: { browserInfo: parsed.data.browserInfo ?? null }
     });
 
-    return NextResponse.json({ ok: true, sessionToken: createExtensionSessionToken(actor.id) });
-  } catch (error) {
-    if (error instanceof Error && error.message === "Unauthorized") {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    return NextResponse.json({ ok: true, sessionToken: createExtensionSessionToken(userId) });
+  } catch {
     return NextResponse.json({ error: "Failed to confirm handshake" }, { status: 500 });
   }
 }

@@ -35,16 +35,18 @@ export default function NewHuntPage() {
   return (
     <Card className="max-w-2xl">
       <h1 className="section-title">Create Hunt Run</h1>
-      <p className="mt-2 text-sm text-muted">Paste a LinkedIn people search results URL.</p>
+      <p className="mt-2 text-sm text-muted">
+        Paste a LinkedIn people-search URL or a single LinkedIn profile URL.
+      </p>
 
       <label className="mb-2 mt-6 block text-xs font-semibold uppercase tracking-wider text-slate-500">Run name</label>
       <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="NL HR leaders - week 14" />
 
-      <label className="mb-2 mt-4 block text-xs font-semibold uppercase tracking-wider text-slate-500">LinkedIn search URL</label>
+      <label className="mb-2 mt-4 block text-xs font-semibold uppercase tracking-wider text-slate-500">LinkedIn URL</label>
       <Input
         value={inputUrl}
         onChange={(e) => setInputUrl(e.target.value)}
-        placeholder="https://www.linkedin.com/search/results/people/?..."
+        placeholder="https://www.linkedin.com/search/results/people/?... or https://www.linkedin.com/in/..."
       />
 
       <label className="mb-2 mt-4 block text-xs font-semibold uppercase tracking-wider text-slate-500">Max pages</label>

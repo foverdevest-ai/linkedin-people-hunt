@@ -1,7 +1,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { LinkedInConnectPanel } from "./LinkedInConnectPanel";
 
 export default async function SettingsLinkedInPage() {
   const session = await auth();
@@ -13,15 +13,13 @@ export default async function SettingsLinkedInPage() {
 
   return (
     <Card>
-      <h1 className="section-title">LinkedIn Connection</h1>
-      <p className="mt-2 text-sm text-muted">Connect via Chrome extension handshake.</p>
-      <div className="mt-4 flex gap-2">
-        <Badge variant={connection?.status === "connected" ? "success" : "warning"}>
-          {connection?.status || "disconnected"}
-        </Badge>
-        <Badge variant="neutral">Last seen: {connection?.lastSeenAt?.toLocaleString() || "-"}</Badge>
-        <Badge variant="neutral">Last sync: {connection?.lastSyncAt?.toLocaleString() || "-"}</Badge>
-      </div>
+      <LinkedInConnectPanel
+        initial={{
+          status: connection?.status || "disconnected",
+          lastSeenAt: connection?.lastSeenAt?.toISOString() || null,
+          lastSyncAt: connection?.lastSyncAt?.toISOString() || null
+        }}
+      />
     </Card>
   );
 }

@@ -1,12 +1,23 @@
-const API_BASE = "http://localhost:3000";
+const DEFAULT_API_BASE = "http://localhost:3000";
+
+async function getApiBase() {
+  const { appApiBase } = await chrome.storage.local.get(["appApiBase"]);
+  return appApiBase || DEFAULT_API_BASE;
+}
 
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.local.set({ appApiBase: API_BASE });
+  chrome.storage.local.get(["appApiBase"]).then(({ appApiBase }) => {
+    if (!appApiBase) {
+      chrome.storage.local.set({ appApiBase: DEFAULT_API_BASE });
+    }
+  });
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "EXT_HELLO") {
-    sendResponse({ ok: true, appApiBase: API_BASE });
+    getApiBase().then((appApiBase) => {
+      sendResponse({ ok: true, appApiBase });
+    });
     return true;
   }
 
@@ -16,7 +27,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({ ok: false, error: "missing_session_token" });
         return;
       }
-      const response = await fetch(`${API_BASE}/api/extension/heartbeat`, {
+      const appApiBase = await getApiBase();
+      const response = await fetch(`${appApiBase}/api/extension/heartbeat`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
