@@ -1,0 +1,12 @@
+node_modules
+.next
+.env
+coverage
+dist
+*.log
+storage/logs/*
+storage/raw/*
+
+deploy.zip
+deploy.tgz
+

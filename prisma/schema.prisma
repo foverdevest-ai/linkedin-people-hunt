@@ -1,0 +1,287 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  rep
+}
+
+enum LinkedInProviderType {
+  browser_extension
+}
+
+enum LinkedInConnectionStatus {
+  disconnected
+  connecting
+  connected
+  stale
+  error
+}
+
+enum HuntRunStatus {
+  draft
+  queued
+  importing
+  imported
+  scoring
+  ready
+  sending
+  completed
+  failed
+  paused
+}
+
+enum ProspectDuplicateStatus {
+  none
+  same_user_recent
+  cross_user_recent
+  same_run_duplicate
+}
+
+enum ProspectSalesforceStatus {
+  unchecked
+  matched
+  not_found
+  error
+  pushed
+  push_failed
+}
+
+enum ProspectMessageableStatus {
+  unknown
+  messageable
+  not_messageable
+}
+
+enum ProspectMessagingStatus {
+  imported
+  skipped_duplicate
+  skipped_existing_salesforce
+  skipped_not_messageable
+  queued
+  sending
+  sent
+  failed
+  replied
+  pushed_to_salesforce
+}
+
+enum SendAttemptStatus {
+  queued
+  sending
+  sent
+  failed
+  skipped
+}
+
+enum AuditAction {
+  user_login
+  user_settings_updated
+  linkedin_connected
+  linkedin_heartbeat
+  hunt_created
+  hunt_status_changed
+  prospects_ingested
+  prospect_skipped
+  send_attempt_logged
+  reply_synced
+  salesforce_checked
+  salesforce_pushed
+  salesforce_push_failed
+}
+
+model User {
+  id                       String                 @id @default(cuid())
+  name                     String
+  email                    String                 @unique
+  passwordHash             String
+  role                     UserRole               @default(rep)
+  salesforceOwnerId        String?
+  defaultMessageTemplateId String?
+  signupTrackingCode       String?
+  isActive                 Boolean                @default(true)
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+
+  messageTemplates         MessageTemplate[]
+  linkedinConnections      LinkedInConnection[]
+  huntRuns                 HuntRun[]
+  prospects                HuntProspect[]
+  sendAttempts             SendAttempt[]
+  auditLogs                AuditLog[]
+  handshakes               ExtensionHandshakeToken[]
+}
+
+model LinkedInConnection {
+  id           String                   @id @default(cuid())
+  userId       String
+  providerType LinkedInProviderType     @default(browser_extension)
+  status       LinkedInConnectionStatus @default(disconnected)
+  lastSeenAt   DateTime?
+  lastSyncAt   DateTime?
+  metadataJson Json?
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, providerType])
+}
+
+model MessageTemplate {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  body      String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model HuntRun {
+  id         String      @id @default(cuid())
+  userId     String
+  name       String?
+  inputUrl   String
+  status     HuntRunStatus @default(draft)
+  autopilot  Boolean     @default(true)
+  maxPages   Int         @default(5)
+  startedAt  DateTime?
+  finishedAt DateTime?
+  statsJson  Json?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prospects HuntProspect[]
+  logs      RunLog[]
+
+  @@index([userId, createdAt])
+}
+
+model HuntProspect {
+  id                  String                  @id @default(cuid())
+  huntRunId           String
+  userId              String
+  normalizedProfileUrl String
+  linkedinMemberId    String?
+  fullName            String?
+  firstName           String?
+  lastName            String?
+  headline            String?
+  jobTitle            String?
+  companyName         String?
+  companyUrl          String?
+  location            String?
+  connectionDegree    String?
+  searchUrl           String?
+  rawJson             Json?
+  score               Int?
+  scoreReasonsJson    Json?
+  duplicateStatus     ProspectDuplicateStatus @default(none)
+  salesforceStatus    ProspectSalesforceStatus @default(unchecked)
+  salesforceMatchId   String?
+  skipReason          String?
+  messageableStatus   ProspectMessageableStatus @default(unknown)
+  messagingStatus     ProspectMessagingStatus @default(imported)
+  threadUrl           String?
+  lastMessageAt       DateTime?
+  repliedAt           DateTime?
+  replySnippet        String?
+  pushedToSalesforceAt DateTime?
+  salesforceCreatedId String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  huntRun      HuntRun      @relation(fields: [huntRunId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sendAttempts SendAttempt[]
+  replyEvents  ReplyEvent[]
+
+  @@unique([huntRunId, normalizedProfileUrl])
+  @@index([normalizedProfileUrl, userId])
+  @@index([messagingStatus])
+}
+
+model SendAttempt {
+  id          String            @id @default(cuid())
+  prospectId  String
+  userId      String
+  status      SendAttemptStatus @default(queued)
+  errorMessage String?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  metadataJson Json?
+  createdAt   DateTime          @default(now())
+
+  prospect HuntProspect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([prospectId, createdAt])
+}
+
+model ReplyEvent {
+  id          String   @id @default(cuid())
+  prospectId  String
+  threadUrl   String?
+  replySnippet String?
+  repliedAt   DateTime
+  rawJson     Json?
+  createdAt   DateTime @default(now())
+
+  prospect HuntProspect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  @@index([prospectId, repliedAt(sort: Desc)])
+}
+
+model AuditLog {
+  id          String     @id @default(cuid())
+  actorUserId String?
+  entityType  String
+  entityId    String?
+  action      AuditAction
+  metadataJson Json?
+  createdAt   DateTime   @default(now())
+
+  actor User? @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([entityType, entityId])
+}
+
+model ExtensionHandshakeToken {
+  id         String   @id @default(cuid())
+  userId     String
+  nonce      String   @unique
+  tokenHash  String
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model RunLog {
+  id        String   @id @default(cuid())
+  huntRunId String
+  level     String
+  message   String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  huntRun HuntRun @relation(fields: [huntRunId], references: [id], onDelete: Cascade)
+
+  @@index([huntRunId, createdAt])
+}
