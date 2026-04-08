@@ -8,7 +8,7 @@ function parseSearchResultsCards(doc = document) {
       jobTitle: ((card.querySelector(".entity-result__summary") || {}).textContent || "").trim(),
       companyName: ((card.querySelector(".entity-result__secondary-subtitle") || {}).textContent || "").trim(),
       location: ((card.querySelector(".entity-result__secondary-subtitle+div") || {}).textContent || "").trim(),
-      messageable: Boolean(card.querySelector("button[aria-label*='Message']")),
+      messageable: Boolean(card.querySelector("button[aria-label*='Message']") || card.querySelector("button[aria-label*='Bericht']")),
       searchUrl: location.href || ""
     }))
     .filter((row) => row.profileUrl);
@@ -23,7 +23,11 @@ function parseReplyThreads(doc = document) {
   }));
 }
 
-async function sendOneMessageToProfile(profileUrl, message) {
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function sendMessageOnCurrentProfile(message) {
   const openResult = {
     status: "failed",
     threadUrl: null,
@@ -31,8 +35,7 @@ async function sendOneMessageToProfile(profileUrl, message) {
   };
 
   try {
-    window.location.href = profileUrl;
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await wait(1500);
 
     const messageButton =
       document.querySelector("button[aria-label*='Message']") ||
@@ -42,7 +45,7 @@ async function sendOneMessageToProfile(profileUrl, message) {
       return openResult;
     }
     messageButton.click();
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+    await wait(1200);
 
     const composer = document.querySelector("div[role='textbox']");
     if (!composer) {
@@ -51,10 +54,12 @@ async function sendOneMessageToProfile(profileUrl, message) {
     }
     composer.focus();
     document.execCommand("insertText", false, message);
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await wait(200);
 
     const sendButton =
-      document.querySelector("button.msg-form__send-button") || document.querySelector("button[aria-label*='Send']");
+      document.querySelector("button.msg-form__send-button") ||
+      document.querySelector("button[aria-label*='Send']") ||
+      document.querySelector("button[aria-label*='Verzenden']");
     if (!sendButton) {
       openResult.errorMessage = "send_button_missing";
       return openResult;
@@ -78,12 +83,12 @@ function jsonHeaders(token) {
 }
 
 async function syncCandidates(payload) {
-  const { runId, apiBase, sessionToken } = payload;
+  const { runId, apiBase, sessionToken, pageNumber } = payload;
   const cards = parseSearchResultsCards(document);
   await fetch(`${apiBase}/api/hunts/${runId}/ingest-candidates`, {
     method: "POST",
     headers: jsonHeaders(sessionToken),
-    body: JSON.stringify({ candidates: cards })
+    body: JSON.stringify({ pageNumber, candidates: cards })
   });
   return { ok: true, count: cards.length };
 }
@@ -105,7 +110,7 @@ async function syncReplies(payload) {
 }
 
 async function sendMessage(payload) {
-  const result = await sendOneMessageToProfile(payload.profileUrl, payload.message);
+  const result = await sendMessageOnCurrentProfile(payload.message);
   await fetch(`${payload.apiBase}/api/hunts/${payload.runId}/send-events`, {
     method: "POST",
     headers: jsonHeaders(payload.sessionToken),

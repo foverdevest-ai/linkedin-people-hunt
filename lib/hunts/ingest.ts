@@ -28,7 +28,7 @@ export type IngestCandidateResult = {
 
 type IngestCandidatesArgs = {
   actorUserId: string;
-  run: Pick<HuntRun, "id" | "autopilot">;
+  run: Pick<HuntRun, "id" | "autopilot" | "statsJson">;
   candidates: IngestCandidateInput[];
 };
 

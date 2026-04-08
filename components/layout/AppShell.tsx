@@ -17,6 +17,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     { href: "/dashboard", label: "Dashboard" },
     { href: "/hunts", label: "Hunts" },
     { href: "/replies", label: "Replies" },
+    { href: "/settings/templates", label: "Templates" },
     { href: "/settings/linkedin", label: "LinkedIn Settings" }
   ] as const;
 

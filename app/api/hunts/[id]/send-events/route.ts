@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { requireActorOrExtensionUser } from "@/lib/auth/actor-or-extension";
 import { canTransitionProspectStatus } from "@/lib/queue/status";
 import { writeAuditLog } from "@/lib/audit/write";
+import { mergeAutopilotState } from "@/lib/hunts/autopilot";
 
 const sendEventSchema = z.object({
   prospectId: z.string().min(1),
@@ -83,6 +84,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       entityId: run.id,
       action: "send_attempt_logged",
       metadataJson: { count: parsed.data.events.length }
+    });
+
+    const failure = parsed.data.events.find((event) => event.status === "failed");
+    await prisma.huntRun.update({
+      where: { id: run.id },
+      data: {
+        statsJson: mergeAutopilotState(run.statsJson, {
+          blockingReason: null,
+          lastAction: "send_event",
+          lastError: failure?.errorMessage ?? null
+        })
+      }
     });
 
     return NextResponse.json({ ok: true });

@@ -5,6 +5,7 @@ const savedStatusEl = document.getElementById("savedStatus");
 const tokenInputEl = document.getElementById("tokenInput");
 const connectBtnEl = document.getElementById("connectBtn");
 const heartbeatBtnEl = document.getElementById("heartbeatBtn");
+const autopilotBtnEl = document.getElementById("autopilotBtn");
 
 function setMessage(text, type = "muted") {
   messageEl.textContent = text;
@@ -137,12 +138,32 @@ async function sendHeartbeat() {
   }
 }
 
+async function runAutopilot() {
+  autopilotBtnEl.disabled = true;
+  try {
+    const result = await chrome.runtime.sendMessage({ type: "EXT_RUN_AUTOPILOT" });
+    if (!result?.ok) {
+      setMessage(result?.error || "Autopilot run failed.", "warn");
+      return;
+    }
+    setMessage("Autopilot tick started.", "ok");
+  } catch {
+    setMessage("Autopilot run failed.", "warn");
+  } finally {
+    autopilotBtnEl.disabled = false;
+  }
+}
+
 connectBtnEl.addEventListener("click", () => {
   completeConnection();
 });
 
 heartbeatBtnEl.addEventListener("click", () => {
   sendHeartbeat();
+});
+
+autopilotBtnEl.addEventListener("click", () => {
+  runAutopilot();
 });
 
 refreshSavedStatus();

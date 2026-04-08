@@ -6,17 +6,20 @@ import { env } from "@/lib/env";
 import { writeAuditLog } from "@/lib/audit/write";
 import { classifyLinkedInInputUrl } from "@/lib/linkedin/input-url";
 import { ingestCandidatesForRun } from "@/lib/hunts/ingest";
+import { mergeAutopilotState } from "@/lib/hunts/autopilot";
+import { requireActorOrExtensionUser } from "@/lib/auth/actor-or-extension";
 
 const createHuntSchema = z.object({
   name: z.string().trim().max(120).optional(),
   inputUrl: z.string().trim().url(),
+  messageTemplateId: z.string().trim().min(1),
   autopilot: z.boolean().default(true),
   maxPages: z.coerce.number().int().min(1).max(50).default(env.DEFAULT_RUN_MAX_PAGES)
 });
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const actor = await requireActorUser();
+    const actor = await requireActorOrExtensionUser(request);
     const runs = await prisma.huntRun.findMany({
       where: { userId: actor.id },
       orderBy: { createdAt: "desc" },
@@ -47,6 +50,20 @@ export async function POST(request: Request) {
       );
     }
 
+    const template = await prisma.messageTemplate.findFirst({
+      where: { id: parsed.data.messageTemplateId, userId: actor.id }
+    });
+    if (!template) {
+      return NextResponse.json({ error: "Message template not found" }, { status: 400 });
+    }
+
+    const connection = await prisma.linkedInConnection.findUnique({
+      where: { userId_providerType: { userId: actor.id, providerType: "browser_extension" } }
+    });
+    if (!connection || connection.status !== "connected") {
+      return NextResponse.json({ error: "Connect LinkedIn before starting a hunt" }, { status: 400 });
+    }
+
     const run = await prisma.huntRun.create({
       data: {
         userId: actor.id,
@@ -54,7 +71,16 @@ export async function POST(request: Request) {
         inputUrl: inputUrlType.normalizedUrl,
         autopilot: parsed.data.autopilot,
         maxPages: parsed.data.maxPages,
-        status: "draft"
+        status: parsed.data.autopilot ? "queued" : "draft",
+        statsJson: mergeAutopilotState(null, {
+          messageTemplateId: template.id,
+          messageTemplateName: template.name,
+          messageBody: template.body,
+          currentPage: 0,
+          blockingReason: parsed.data.autopilot ? null : "manual_start_required",
+          lastAction: "created",
+          lastError: null
+        })
       }
     });
     await writeAuditLog({
@@ -62,13 +88,19 @@ export async function POST(request: Request) {
       entityType: "hunt_run",
       entityId: run.id,
       action: "hunt_created",
-      metadataJson: { inputUrl: run.inputUrl, inputUrlType: inputUrlType.type, autopilot: run.autopilot, maxPages: run.maxPages }
+      metadataJson: {
+        inputUrl: run.inputUrl,
+        inputUrlType: inputUrlType.type,
+        autopilot: run.autopilot,
+        maxPages: run.maxPages,
+        messageTemplateId: template.id
+      }
     });
 
     if (inputUrlType.type === "profile") {
       const results = await ingestCandidatesForRun({
         actorUserId: actor.id,
-        run: { id: run.id, autopilot: run.autopilot },
+        run: { id: run.id, autopilot: run.autopilot, statsJson: run.statsJson },
         candidates: [
           {
             profileUrl: inputUrlType.normalizedUrl,

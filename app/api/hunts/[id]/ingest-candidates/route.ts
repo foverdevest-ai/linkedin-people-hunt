@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { requireActorOrExtensionUser } from "@/lib/auth/actor-or-extension";
 import { ingestCandidatesForRun } from "@/lib/hunts/ingest";
 import { writeAuditLog } from "@/lib/audit/write";
+import { getAutopilotState, mergeAutopilotState } from "@/lib/hunts/autopilot";
 
 const candidateSchema = z.object({
   profileUrl: z.string().url(),
@@ -21,6 +22,7 @@ const candidateSchema = z.object({
 });
 
 const payloadSchema = z.object({
+  pageNumber: z.coerce.number().int().min(1).optional(),
   candidates: z.array(candidateSchema).min(1)
 });
 
@@ -38,8 +40,22 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const results = await ingestCandidatesForRun({
       actorUserId: actor.id,
-      run: { id: run.id, autopilot: run.autopilot },
+      run: { id: run.id, autopilot: run.autopilot, statsJson: run.statsJson },
       candidates: parsed.data.candidates
+    });
+
+    const currentState = getAutopilotState(run.statsJson);
+    const nextPage = parsed.data.pageNumber ? Math.max(currentState.currentPage, parsed.data.pageNumber) : currentState.currentPage;
+    await prisma.huntRun.update({
+      where: { id: run.id },
+      data: {
+        statsJson: mergeAutopilotState(run.statsJson, {
+          currentPage: nextPage,
+          blockingReason: null,
+          lastAction: "ingest_candidates",
+          lastError: null
+        })
+      }
     });
 
     await writeAuditLog({
@@ -47,7 +63,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       entityType: "hunt_run",
       entityId: run.id,
       action: "prospects_ingested",
-      metadataJson: { count: parsed.data.candidates.length, results }
+      metadataJson: { count: parsed.data.candidates.length, pageNumber: parsed.data.pageNumber ?? null, results }
     });
 
     return NextResponse.json({ ok: true, results });
